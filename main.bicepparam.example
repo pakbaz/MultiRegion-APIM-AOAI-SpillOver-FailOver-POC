@@ -1,0 +1,76 @@
+using 'main.bicep'
+
+// ============================================================================
+// Example Parameters for Multi-Region Azure APIM + AOAI Deployment
+// ============================================================================
+// 
+// USAGE:
+//   1. Copy this file to 'main.bicepparam'
+//   2. Replace placeholder values with your actual configuration
+//   3. Deploy using: az deployment sub create --template-file main.bicep --parameters main.bicepparam
+//
+// ============================================================================
+
+// Base naming - use a unique prefix for your organization
+// This will be used as prefix for all resource names
+param baseName = '<your-unique-prefix>'  // e.g., 'contoso-aoai', 'mycompany-openai'
+
+// Regions - Azure regions for multi-region deployment
+// Choose regions where Azure OpenAI is available: https://learn.microsoft.com/azure/ai-services/openai/concepts/models
+param primaryLocation = 'eastus'
+param secondaryLocation = 'westus'
+
+// APIM Configuration
+param apimPublisherEmail = '<your-email@example.com>'  // Required: Valid email address
+param apimPublisherName = '<Your Organization Name>'   // Organization name shown in developer portal
+
+// Tags - customize for your environment
+param tags = {
+  project: 'APIM-AOAI-Multi-Region'
+  environment: 'poc'      // Change to 'dev', 'staging', 'prod' as appropriate
+  deployedBy: 'bicep'
+  owner: '<your-team>'    // Optional: team/owner identifier
+}
+
+// ============================================================================
+// Azure OpenAI Capacity Configuration
+// ============================================================================
+// 
+// Capacity is specified in TPM (Tokens Per Minute) thousands for GlobalStandard SKU
+// For PTU, this would be the number of PTU units
+//
+// For testing capacity spillover, keep primary capacity low
+// For production, increase based on your expected load
+
+// Primary deployment capacity (low for testing spillover scenarios)
+param gpt4oPrimaryCapacity = 10        // 10K TPM - intentionally low for spillover testing
+param gpt4oMiniPrimaryCapacity = 10    // 10K TPM - intentionally low for spillover testing
+
+// Spillover deployment capacity (higher to handle overflow)
+param gpt4oSpilloverCapacity = 80      // 80K TPM - higher capacity for spillover
+param gpt4oMiniSpilloverCapacity = 80  // 80K TPM - higher capacity for spillover
+
+// ============================================================================
+// NOTES:
+// ============================================================================
+//
+// 1. PTU vs Pay-as-you-go:
+//    - Original design uses PTU (Provisioned Throughput Units) for primary
+//    - Due to PTU quota limitations, this template uses GlobalStandard (PAYG)
+//    - To use PTU, change the SKU in modules/aoai/aoai.bicep and ensure quota
+//
+// 2. Resource Naming:
+//    - All resources will be prefixed with baseName
+//    - Resource group: rg-{baseName}
+//    - AOAI accounts: {baseName}-aoai-{region}
+//    - APIM: {baseName}-apim
+//    - Front Door: {baseName}-fd
+//
+// 3. Deployment Time:
+//    - Full deployment takes 30-45 minutes (APIM Premium is slow to provision)
+//    - Front Door global propagation may take additional 10-30 minutes
+//
+// 4. Required Permissions:
+//    - Contributor access to subscription
+//    - Ability to create service principals and role assignments
+//

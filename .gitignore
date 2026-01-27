@@ -1,0 +1,53 @@
+# ============================================================================
+# .gitignore for Multi-Region Azure APIM + AOAI Architecture
+# ============================================================================
+
+# Compiled Bicep output (regenerate with: az bicep build)
+main.json
+
+# Parameter files with actual values (use .example as template)
+main.bicepparam
+!main.bicepparam.example
+
+# Environment-specific files
+.env
+.env.*
+*.local
+
+# Test output files
+/tmp/
+*.log
+test-results/
+
+# Azure CLI files
+.azure/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Terraform state (if using)
+*.tfstate
+*.tfstate.*
+.terraform/
+
+# Node.js (if any tooling)
+node_modules/
+package-lock.json
+
+# Secrets and credentials (never commit these!)
+**/secrets/
+**/credentials/
+*.pem
+*.key
+*.crt
+*.pfx
+
+# Deployment artifacts
+*.zip
+*.tar.gz
