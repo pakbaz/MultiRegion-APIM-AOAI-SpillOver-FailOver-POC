@@ -1,4 +1,4 @@
-"# Multi-Region Azure APIM + Azure OpenAI Architecture
+# Multi-Region Azure APIM + Azure OpenAI Architecture
 
 A production-ready Bicep template for deploying a highly available, multi-region Azure architecture with Azure Front Door, API Management, and Azure OpenAI.
 
