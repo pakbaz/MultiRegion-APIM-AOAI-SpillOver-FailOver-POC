@@ -49,7 +49,8 @@ param gpt4oMiniSpilloverCapacity int = 80
 var resourceGroupName = 'rg-${baseName}'
 var aoaiPrimaryName = '${baseName}-aoai-${primaryLocation}'
 var aoaiSecondaryName = '${baseName}-aoai-${secondaryLocation}'
-var apimName = '${baseName}-apim'
+var apimPrimaryName = '${baseName}-apim-${primaryLocation}'
+var apimSecondaryName = '${baseName}-apim-${secondaryLocation}'
 var frontDoorName = '${baseName}-fd'
 
 // ============================================================================
@@ -99,20 +100,19 @@ module aoaiSecondary 'modules/aoai/aoai.bicep' = {
 }
 
 // ============================================================================
-// API Management
+// API Management - Primary Region
 // ============================================================================
 
-module apim 'modules/apim/apim.bicep' = {
+module apimPrimary 'modules/apim/apim.bicep' = {
   scope: resourceGroup
-  name: 'deploy-apim'
-  dependsOn: [aoaiPrimary, aoaiSecondary]
+  name: 'deploy-apim-primary'
   params: {
-    name: apimName
+    name: apimPrimaryName
     location: primaryLocation
     publisherEmail: apimPublisherEmail
     publisherName: apimPublisherName
-    tags: tags
-    skuName: 'Premium'
+    tags: union(tags, { region: primaryLocation })
+    skuName: 'Standard'
     skuCapacity: 1
     aoaiPrimaryEndpoint: aoaiPrimary.outputs.endpoint
     aoaiSecondaryEndpoint: aoaiSecondary.outputs.endpoint
@@ -120,29 +120,65 @@ module apim 'modules/apim/apim.bicep' = {
 }
 
 // ============================================================================
-// Role Assignment - APIM to Azure OpenAI (Primary)
+// API Management - Secondary Region
 // ============================================================================
 
-module roleAssignmentPrimary 'modules/rbac/cognitive-services-user.bicep' = {
+module apimSecondary 'modules/apim/apim.bicep' = {
   scope: resourceGroup
-  name: 'deploy-role-assignment-primary'
-  dependsOn: [apim, aoaiPrimary]
+  name: 'deploy-apim-secondary'
   params: {
-    principalId: apim.outputs.principalId
-    cognitiveServicesAccountName: aoaiPrimaryName
+    name: apimSecondaryName
+    location: secondaryLocation
+    publisherEmail: apimPublisherEmail
+    publisherName: apimPublisherName
+    tags: union(tags, { region: secondaryLocation })
+    skuName: 'Standard'
+    skuCapacity: 1
+    aoaiPrimaryEndpoint: aoaiPrimary.outputs.endpoint
+    aoaiSecondaryEndpoint: aoaiSecondary.outputs.endpoint
   }
 }
 
 // ============================================================================
-// Role Assignment - APIM to Azure OpenAI (Secondary)
+// Role Assignments - Primary APIM to Azure OpenAI (both regions)
 // ============================================================================
 
-module roleAssignmentSecondary 'modules/rbac/cognitive-services-user.bicep' = {
+module roleAssignmentPrimaryApimToPrimaryAoai 'modules/rbac/cognitive-services-user.bicep' = {
   scope: resourceGroup
-  name: 'deploy-role-assignment-secondary'
-  dependsOn: [apim, aoaiSecondary]
+  name: 'deploy-role-primary-apim-primary-aoai'
   params: {
-    principalId: apim.outputs.principalId
+    principalId: apimPrimary.outputs.principalId
+    cognitiveServicesAccountName: aoaiPrimaryName
+  }
+}
+
+module roleAssignmentPrimaryApimToSecondaryAoai 'modules/rbac/cognitive-services-user.bicep' = {
+  scope: resourceGroup
+  name: 'deploy-role-primary-apim-secondary-aoai'
+  params: {
+    principalId: apimPrimary.outputs.principalId
+    cognitiveServicesAccountName: aoaiSecondaryName
+  }
+}
+
+// ============================================================================
+// Role Assignments - Secondary APIM to Azure OpenAI (both regions)
+// ============================================================================
+
+module roleAssignmentSecondaryApimToPrimaryAoai 'modules/rbac/cognitive-services-user.bicep' = {
+  scope: resourceGroup
+  name: 'deploy-role-secondary-apim-primary-aoai'
+  params: {
+    principalId: apimSecondary.outputs.principalId
+    cognitiveServicesAccountName: aoaiPrimaryName
+  }
+}
+
+module roleAssignmentSecondaryApimToSecondaryAoai 'modules/rbac/cognitive-services-user.bicep' = {
+  scope: resourceGroup
+  name: 'deploy-role-secondary-apim-secondary-aoai'
+  params: {
+    principalId: apimSecondary.outputs.principalId
     cognitiveServicesAccountName: aoaiSecondaryName
   }
 }
@@ -154,12 +190,11 @@ module roleAssignmentSecondary 'modules/rbac/cognitive-services-user.bicep' = {
 module frontDoor 'modules/frontdoor/frontdoor.bicep' = {
   scope: resourceGroup
   name: 'deploy-frontdoor'
-  dependsOn: [apim]
   params: {
     name: frontDoorName
     tags: tags
-    apimPrimaryGatewayUrl: apim.outputs.gatewayUrl
-    apimSecondaryGatewayUrl: apim.outputs.gatewayUrl // Same APIM with multi-region
+    apimPrimaryGatewayUrl: apimPrimary.outputs.gatewayUrl
+    apimSecondaryGatewayUrl: apimSecondary.outputs.gatewayUrl
     primaryRegionName: primaryLocation
     secondaryRegionName: secondaryLocation
   }
@@ -178,14 +213,23 @@ output aoaiPrimaryEndpoint string = aoaiPrimary.outputs.endpoint
 @description('Azure OpenAI Secondary endpoint')
 output aoaiSecondaryEndpoint string = aoaiSecondary.outputs.endpoint
 
-@description('API Management gateway URL')
-output apimGatewayUrl string = apim.outputs.gatewayUrl
+@description('API Management Primary gateway URL')
+output apimPrimaryGatewayUrl string = apimPrimary.outputs.gatewayUrl
 
-@description('API Management developer portal URL')
-output apimDeveloperPortalUrl string = apim.outputs.developerPortalUrl
+@description('API Management Secondary gateway URL')
+output apimSecondaryGatewayUrl string = apimSecondary.outputs.gatewayUrl
+
+@description('API Management Primary developer portal URL')
+output apimPrimaryDeveloperPortalUrl string = apimPrimary.outputs.developerPortalUrl
+
+@description('API Management Secondary developer portal URL')
+output apimSecondaryDeveloperPortalUrl string = apimSecondary.outputs.developerPortalUrl
 
 @description('Front Door endpoint URL')
 output frontDoorEndpointUrl string = frontDoor.outputs.endpointUrl
 
-@description('APIM Principal ID (for role assignments)')
-output apimPrincipalId string = apim.outputs.principalId
+@description('APIM Primary Principal ID')
+output apimPrimaryPrincipalId string = apimPrimary.outputs.principalId
+
+@description('APIM Secondary Principal ID')
+output apimSecondaryPrincipalId string = apimSecondary.outputs.principalId

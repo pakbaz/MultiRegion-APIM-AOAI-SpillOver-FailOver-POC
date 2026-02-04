@@ -18,9 +18,9 @@ param publisherName string
 @description('Tags to apply to the resource')
 param tags object = {}
 
-@description('SKU name for APIM (Premium required for multi-region)')
+@description('SKU name for APIM')
 @allowed(['Developer', 'Basic', 'Standard', 'Premium'])
-param skuName string = 'Premium'
+param skuName string = 'Standard'
 
 @description('SKU capacity (number of units)')
 param skuCapacity int = 1
